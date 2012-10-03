@@ -172,6 +172,14 @@ module Gitolite
             when /^subconf (\S+)$/
               #TODO: implement subconfs
               #ignore subconfs for now
+            when /^option mirror\.(.+) = (.+)$/
+              mirrortype = $1
+              mirrornames = $2.split
+              context.each do |c|
+                mirrornames.each do |m|
+                  @repos[c].set_mirror(m, mirrortype)
+                end
+              end
             else
               raise ParseError, "'#{line}' cannot be processed"
           end

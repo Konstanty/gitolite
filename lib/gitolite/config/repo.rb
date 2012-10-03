@@ -4,8 +4,9 @@ module Gitolite
     #options are all encapsulated in this class
     class Repo
       ALLOWED_PERMISSIONS = /-|C|R|RW\+?(?:C?D?|D?C?)M?/
+      ALLOWED_MIRROR_TYPES = /(master|slaves)/
 
-      attr_accessor :permissions, :name, :config, :owner, :description
+      attr_accessor :permissions, :name, :config, :owner, :description, :mirrors
 
       def initialize(name)
         #Store the perm hash in a lambda since we have to create a new one on every deny rule
@@ -16,6 +17,7 @@ module Gitolite
 
         @name = name
         @config = {} #git config
+        @mirrors = {} # possible mirrors
       end
 
       def clean_permissions
@@ -34,6 +36,26 @@ module Gitolite
         else
           raise InvalidPermissionError, "#{perm} is not in the allowed list of permissions!"
         end
+      end
+
+      def set_mirror(name, type)
+        if type =~ ALLOWED_MIRROR_TYPES
+          # check only 1 master/ default to override old
+          if (type == "master")
+            @mirrors.each do |m, t|
+              if (t == "master")
+               @mirrors.delete(m)
+              end
+            end
+          end
+          @mirrors[name] = type;
+        else
+         raise InvalidMirrorError, "#{type} is nott a valid mirror type!"
+        end
+      end
+
+      def delete_mirror(name)
+        @mirrors.delete(name)
       end
 
       def set_git_config(key, value)
@@ -57,6 +79,18 @@ module Gitolite
 
         @config.each do |k, v|
           repo += "  config " + k + " = " + v + "\n"
+        end
+
+        if !@mirrors.nil?
+# if we have mirrors, reverse the array to be by type, as we need to list all mirrors together
+          mirrorsbytype = {};
+          @mirrors.each do |m, t|
+            mirrorsbytype[t] = [] if mirrorsbytype[t].nil?
+            mirrorsbytype[t] << m
+          end
+          mirrorsbytype.each do |t,m|
+            repo += "  option mirror." + t + " = " + m.join(' ') + "\n"
+          end
         end
 
         repo
